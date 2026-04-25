@@ -1,19 +1,28 @@
 import Link from 'next/link'
 import { ArrowRight, ShieldCheck, Truck, HeadphonesIcon, RotateCcw } from 'lucide-react'
 import ProductCard from '@/components/products/ProductCard'
-import { products, categories } from '@/lib/data'
+import { supabase } from '@/lib/supabase'
+import { categories as localCategories, products as localProducts } from '@/lib/data'
+import { Category, Product } from '@/types'
 
 const categoryEmojis: Record<string, string> = {
-  'bep-nau-nuong': '🍳',
-  'may-gia-dung': '🔌',
-  'phong-ngu': '🛏️',
-  'phong-tam': '🚿',
-  'don-dep': '🧹',
-  'do-dien-tu': '💡',
+  'bep-nau-nuong': '🍳', 'may-gia-dung': '🔌', 'phong-ngu': '🛏️',
+  'phong-tam': '🚿', 'don-dep': '🧹', 'do-dien-tu': '💡',
 }
 
-export default function HomePage() {
-  const featuredProducts = products.filter(p => p.is_featured)
+async function getData() {
+  const [{ data: dbCategories }, { data: dbProducts }] = await Promise.all([
+    supabase.from('categories').select('*').order('name'),
+    supabase.from('products').select('*, category:categories(id,name,slug)').eq('is_featured', true).limit(8),
+  ])
+  return {
+    categories: (dbCategories as Category[]) ?? localCategories,
+    featuredProducts: (dbProducts as Product[]) ?? localProducts.filter(p => p.is_featured),
+  }
+}
+
+export default async function HomePage() {
+  const { categories, featuredProducts } = await getData()
 
   return (
     <div>
@@ -27,12 +36,10 @@ export default function HomePage() {
           <p className="text-lg md:text-xl text-orange-100 mb-8 max-w-2xl mx-auto">
             Hàng nghìn sản phẩm gia dụng chất lượng cao. Tư vấn AI 24/7, giao hàng nhanh toàn quốc.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/products"
-              className="bg-white text-orange-600 font-bold px-8 py-3 rounded-full hover:shadow-lg transition-all hover:scale-105 flex items-center justify-center gap-2">
-              Mua Sắm Ngay <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
+          <Link href="/products"
+            className="bg-white text-orange-600 font-bold px-8 py-3 rounded-full hover:shadow-lg transition-all hover:scale-105 inline-flex items-center gap-2">
+            Mua Sắm Ngay <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
@@ -65,7 +72,7 @@ export default function HomePage() {
           {categories.map(cat => (
             <Link key={cat.id} href={`/products?category=${cat.slug}`}
               className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl hover:shadow-md hover:-translate-y-1 transition-all border border-gray-100">
-              <span className="text-3xl">{categoryEmojis[cat.slug]}</span>
+              <span className="text-3xl">{categoryEmojis[cat.slug] ?? '📦'}</span>
               <span className="text-xs font-medium text-gray-700 text-center leading-tight">{cat.name}</span>
             </Link>
           ))}

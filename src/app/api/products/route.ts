@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { products } from '@/lib/data'
+import { supabase } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -7,26 +7,29 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get('search')
   const featured = searchParams.get('featured')
 
-  let filtered = [...products]
+  let query = supabase
+    .from('products')
+    .select('*, category:categories(id, name, slug)')
 
   if (category) {
-    const { categories } = await import('@/lib/data')
-    const cat = categories.find(c => c.slug === category)
-    if (cat) filtered = filtered.filter(p => p.category_id === cat.id)
+    const { data: cat } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('slug', category)
+      .single()
+    if (cat) query = query.eq('category_id', cat.id)
   }
 
   if (search) {
-    const q = search.toLowerCase()
-    filtered = filtered.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      p.description.toLowerCase().includes(q) ||
-      p.brand?.toLowerCase().includes(q)
-    )
+    query = query.or(`name.ilike.%${search}%,brand.ilike.%${search}%`)
   }
 
   if (featured === 'true') {
-    filtered = filtered.filter(p => p.is_featured)
+    query = query.eq('is_featured', true)
   }
 
-  return NextResponse.json(filtered)
+  const { data, error } = await query.order('created_at', { ascending: false })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
 }
